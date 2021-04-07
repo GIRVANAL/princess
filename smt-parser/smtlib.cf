@@ -1,0 +1,247 @@
+-- This file is part of Princess, a theorem prover for Presburger
+-- arithmetic with uninterpreted predicates.
+-- <http://www.philipp.ruemmer.org/princess.shtml>
+--
+-- Copyright (C) 2009-2021 Philipp Ruemmer <ph_r@gmx.net>
+--
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+-- 
+-- * Redistributions of source code must retain the above copyright notice, this
+--   list of conditions and the following disclaimer.
+-- 
+-- * Redistributions in binary form must reproduce the above copyright notice,
+--   this list of conditions and the following disclaimer in the documentation
+--   and/or other materials provided with the distribution.
+-- 
+-- * Neither the name of the authors nor the names of their
+--   contributors may be used to endorse or promote products derived from
+--   this software without specific prior written permission.
+-- 
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+-- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-- SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-- CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-- OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
+-- BNF Grammar of the SMT-LIB 2 Format
+
+comment ";";
+
+--------------------------------------------------------------------------------
+-- Entry point
+
+Script.                 ScriptC         ::= [Command];
+
+--------------------------------------------------------------------------------
+-- Benchmark Commands
+
+-- In the next rule, "Symbol" actually has to start with a letter
+SetLogicCommand.        Command         ::= "(" "set-logic" Symbol ")";
+SetOptionCommand.       Command         ::= "(" "set-option" OptionC ")";
+SetInfoCommand.         Command         ::= "(" "set-info" Annotation ")";
+SortDeclCommand. 	Command	        ::= "(" "declare-sort" Symbol Numeral ")";
+SortDefCommand. 	Command	        ::= "(" "define-sort" Symbol
+                                                "(" [Symbol] ")" Sort ")";
+DataDeclsCommand.       Command         ::= "(" "declare-datatypes"
+                                                "(" [PolySortC] ")"
+                                                "(" [MaybeParDataDecl] ")" ")";
+DataDeclsOldCommand.    Command         ::= "(" "declare-datatypes"
+                                                "(" [Symbol] ")"
+                                                "(" [OldDataDeclC] ")" ")";
+DataDeclCommand.        Command         ::= "(" "declare-datatype" Symbol
+                                                "(" [ConstructorDeclC] ")" ")";
+HeapDeclCommand.        Command         ::= "(" "declare-heap" Identifier Identifier Identifier
+                                                Term
+                                                "(" [PolySortC] ")"
+                                                "(" [MaybeParDataDecl] ")" ")";
+FunctionDeclCommand.	Command	        ::= "(" "declare-fun" Symbol
+                                                "(" MESorts ")" Sort ")";
+ConstDeclCommand.	Command	        ::= "(" "declare-const" Symbol Sort ")";
+FunctionDefCommand.	Command	        ::= "(" "define-fun" Symbol
+                                                "(" [ESortedVarC] ")"
+                                                Sort Term ")";
+ConstDefCommand.	Command	        ::= "(" "define-const" Symbol
+                                                Sort Term ")";
+RecFunctionDefCommand.	Command	        ::= "(" "define-fun-rec" Symbol
+                                                "(" [ESortedVarC] ")"
+                                                Sort Term ")";
+RecFunctionDefsCommand.	Command	        ::= "(" "define-funs-rec"
+                                                "(" [FunSignatureC] ")"
+                                                "(" [Term] ")" ")";
+PushCommand.            Command         ::= "(" "push" Numeral ")";
+PopCommand.             Command         ::= "(" "pop" Numeral ")";
+AssertCommand.          Command	        ::= "(" "assert" Term ")";
+CheckSatCommand.        Command	        ::= "(" "check-sat" ")";
+GetAssertionsCommand.   Command	        ::= "(" "get-assertions" ")";
+GetValueCommand.        Command	        ::= "(" "get-value" "(" [Term] ")" ")";
+GetProofCommand.        Command	        ::= "(" "get-proof" ")";
+GetUnsatCoreCommand.    Command	        ::= "(" "get-unsat-core" ")";
+GetAssignmentCommand.   Command	        ::= "(" "get-assignment" ")";
+GetModelCommand.        Command	        ::= "(" "get-model" ")";
+GetInterpolantsCommand. Command	        ::= "(" "get-interpolants" [SExpr] ")";
+GetInfoCommand.         Command	        ::= "(" "get-info" AnnotAttribute ")";
+GetOptionCommand.       Command	        ::= "(" "get-option" AnnotAttribute ")";
+EchoCommand.            Command	        ::= "(" "echo" SMTString ")";
+ResetCommand.           Command	        ::= "(" "reset" ")";
+ExitCommand.            Command	        ::= "(" "exit" ")";
+
+IgnoreCommand.          Command         ::= "(" "ignore" Term ")";
+EmptyCommand.           Command         ::= "(" ")";
+
+separator Command "";
+
+--------------------------------------------------------------------------------
+-- Benchmark Options
+
+Option.                 OptionC         ::= Annotation;
+
+--------------------------------------------------------------------------------
+-- Sorts and their declarations
+
+IdentSort.	Sort		::= Identifier;
+CompositeSort.	Sort		::= "(" Identifier [Sort] ")";
+
+separator nonempty Sort "";
+
+SomeSorts.      MESorts         ::= [Sort];
+NoSorts.        MESorts         ::= ;
+
+--------------------------------------------------------------------------------
+-- Algebraic data-types and their declarations
+
+NullConstructorDecl.ConstructorDeclC ::= Symbol;
+ConstructorDecl.   ConstructorDeclC ::= "(" Symbol [SelectorDeclC] ")";
+separator nonempty ConstructorDeclC "";
+
+SelectorDecl.      SelectorDeclC    ::= "(" Symbol Sort ")";
+separator SelectorDeclC "";
+
+PolySort.          PolySortC        ::= "(" Symbol Numeral ")";
+separator nonempty PolySortC "";
+
+MonoDataDecl.      MaybeParDataDecl ::= "(" [ConstructorDeclC] ")";
+ParDataDecl.       MaybeParDataDecl ::= "(" "par" "(" [Symbol] ")"
+                                            "(" [ConstructorDeclC] ")" ")";
+separator nonempty MaybeParDataDecl "";
+
+OldDataDecl.       OldDataDeclC     ::= "(" Symbol [ConstructorDeclC] ")";
+
+separator nonempty OldDataDeclC "";
+
+--------------------------------------------------------------------------------
+-- Terms
+
+ConstantTerm.	Term		::= SpecConstant;
+-- The following rule captures both nullary functions (constants)
+-- and variables
+NullaryTerm.	Term		::= SymbolRef;
+FunctionTerm.	Term		::= "(" SymbolRef [Term] ")";
+LetTerm.	Term		::= "(" "let" "(" [BindingC] ")" Term ")";
+QuantifierTerm.	Term		::= "(" Quantifier
+				    	"(" [SortedVariableC] ")" Term ")";
+
+AnnotationTerm.	Term		::= "(" "!" Term [Annotation] ")";
+
+separator nonempty Term "";
+
+Binding.	BindingC	::= "(" Symbol Term ")";
+
+separator nonempty BindingC "";
+
+AllQuantifier.	Quantifier	::= "forall";
+ExQuantifier.	Quantifier	::= "exists";
+EpsQuantifier.	Quantifier	::= "_eps";
+
+--------------------------------------------------------------------------------
+-- Functions, constants, variables
+
+-- The category "SymbolRef" is used both for variables and nullary
+-- functions
+IdentifierRef.	SymbolRef	::= Identifier;
+CastIdentifierRef.SymbolRef	::= "(" "as" Identifier Sort ")";
+
+FunSignature.   FunSignatureC   ::= "(" Symbol "(" [ESortedVarC] ")" Sort ")";
+
+separator nonempty FunSignatureC "";
+
+--------------------------------------------------------------------------------
+-- Variables
+
+SortedVariable.	SortedVariableC	::= "(" Symbol Sort ")";
+
+separator nonempty SortedVariableC "";
+
+ESortedVar.     ESortedVarC	::= "(" Symbol Sort ")";
+
+separator ESortedVarC "";
+
+--------------------------------------------------------------------------------
+-- Literals
+
+NumConstant.	SpecConstant	::= Numeral;
+RatConstant.	SpecConstant	::= Rational;
+HexConstant.	SpecConstant	::= Hexadecimal;
+BinConstant.	SpecConstant	::= Binary;
+StringConstant.	SpecConstant	::= SMTString;
+StringSQConstant.SpecConstant	::= SMTStringSQ;
+
+token Numeral     ('0' | (["123456789"] ["0123456789"]*));
+token Rational    (('0' | (["123456789"] ["0123456789"]*)) '.' ["0123456789"]+);
+token Hexadecimal ({"#x"} ["0123456789ABCDEFabcdef"]+);
+token Binary      ({"#b"} ["01"]+);
+
+NumMetaConstant.MetaConstant	::= "NUMERAL";
+RatMetaConstant.MetaConstant	::= "RATIONAL";
+HexMetaConstant.MetaConstant	::= "HEXADECIMAL";
+BinMetaConstant.MetaConstant	::= "BINARY";
+StringMetaConstant.MetaConstant	::= "STRING";
+
+--------------------------------------------------------------------------------
+-- Tokens for identifiers and benchmark/family/logic names
+
+SymbolIdent.	Identifier	::= Symbol;
+IndexIdent.	Identifier	::= "(" "_" Symbol [IndexC] ")";
+
+Index.		IndexC		::= Numeral;
+
+separator nonempty IndexC "";
+
+NormalSymbol.   Symbol          ::= NormalSymbolT;
+QuotedSymbol.   Symbol          ::= QuotedSymbolT;
+
+token NormalSymbolT ((["+-/*=~?!._$%&^<>@"] | letter)
+                     (["+-/*=~?!._$%&^<>@:"] | letter | digit)*);
+
+token QuotedSymbolT ('|' (char - ["\\|"])* '|');
+
+token SMTString       ('"' ((char - '"') | {"\"\""})* '"');
+token SMTStringSQ     ('\'' ((char - '\'') | {"\'\'"})* '\'');
+
+separator Symbol "";
+
+--------------------------------------------------------------------------------
+-- Annotations
+
+AttrAnnotation.	Annotation	::= AnnotAttribute AttrParam;
+
+separator nonempty Annotation "";
+
+SomeAttrParam.	AttrParam	::= SExpr;
+NoAttrParam.	AttrParam	::= ;
+
+token AnnotAttribute(':'
+                     (["+-/*=~?!._$%&^<>@:"] | letter)
+                     (["+-/*=~?!._$%&^<>@:"] | letter | digit)*);
+
+ConstantSExpr.	SExpr		::= SpecConstant;
+SymbolSExpr.	SExpr		::= Symbol;
+ParenSExpr.	SExpr		::= "(" [SExpr] ")";
+
+separator SExpr "";

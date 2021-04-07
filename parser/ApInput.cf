@@ -1,0 +1,213 @@
+-- This file is part of Princess, a theorem prover for Presburger
+-- arithmetic with uninterpreted predicates.
+-- <http://www.philipp.ruemmer.org/princess.shtml>
+--
+-- Copyright (C) 2009-2019 Philipp Ruemmer <ph_r@gmx.net>
+--
+-- Redistribution and use in source and binary forms, with or without
+-- modification, are permitted provided that the following conditions are met:
+-- 
+-- * Redistributions of source code must retain the above copyright notice, this
+--   list of conditions and the following disclaimer.
+-- 
+-- * Redistributions in binary form must reproduce the above copyright notice,
+--   this list of conditions and the following disclaimer in the documentation
+--   and/or other materials provided with the distribution.
+-- 
+-- * Neither the name of the authors nor the names of their
+--   contributors may be used to endorse or promote products derived from
+--   this software without specific prior written permission.
+-- 
+-- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+-- FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-- DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-- SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-- CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-- OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+entrypoints Entry;
+
+APIEntry.       Entry           ::= API;
+ExprEntry.      Entry           ::= Expression;
+
+BlockList.	API		::= [Block];
+terminator Block "";
+
+comment "//";
+comment "/*" "*/";
+
+--------------------------------------------------------------------------------
+-- Top-level blocks
+
+Problem.	Block		::= "\\problem" "{" Expression "}";
+SortDecls.	Block		::= "\\sorts" "{" [DeclSortC] "}";
+FunctionDecls.	Block		::= "\\functions" "{" [DeclFunC] "}";
+ExConstants.	Block		::= ExConstantsSec "{" [DeclConstantC] "}";
+UniConstants.	Block		::= "\\universalConstants" "{" [DeclConstantC] "}";
+PredDecls.	Block		::= "\\predicates" "{" [DeclPredC] "}";
+Interpolant.    Block           ::= "\\interpolant" "{" [InterpBlockC] "}";
+
+ECS1.		ExConstantsSec  ::= "\\existentialConstants";
+ECS2.		ExConstantsSec  ::= "\\metaVariables";
+ECS3.		ExConstantsSec  ::= "\\variables";
+
+InterpBlock.    InterpBlockC    ::= [Ident];
+separator nonempty InterpBlockC ";";
+
+--------------------------------------------------------------------------------
+-- Expressions, which cover both first-order formulas and terms
+
+ExprEqv.	Expression	::= Expression "<->" Expression1;
+ExprImp.	Expression1	::= Expression2 "->" Expression1;
+ExprImpInv.	Expression1	::= Expression1 "<-" Expression2;
+ExprOr.		Expression2	::= Expression2 "|" Expression3;
+ExprOrOr.	Expression2	::= Expression2 "||" Expression3;
+ExprAnd.	Expression3	::= Expression3 "&" Expression4;
+ExprAndAnd.	Expression3	::= Expression3 "&&" Expression4;
+ExprNot.	Expression4	::= "!" Expression4;
+ExprQuant.	Expression4	::= Quant DeclBinder Expression4;
+ExprEpsilon.	Expression4	::= "\\eps" DeclSingleVarC ";" Expression4;
+ExprTrigger.	Expression4	::= "{" [ArgC] "}" Expression4;
+ExprPart.       Expression4     ::= "\\part" "[" Ident "]" Expression4;
+ExprRel.	Expression5	::= Expression6 RelSym Expression6;
+
+ExprShiftL.	Expression6	::= Expression6 "<<" Expression7;
+ExprShiftR.	Expression6	::= Expression6 ">>" Expression7;
+ExprPlus.	Expression7	::= Expression7 "+" Expression8;
+ExprMinus.	Expression7	::= Expression7 "-" Expression8;
+ExprMult.	Expression8	::= Expression8 "*" Expression9;
+ExprDiv.	Expression8	::= Expression8 "/" Expression9;
+ExprMod.	Expression8	::= Expression8 "%" Expression9;
+ExprConcat.	Expression8	::= Expression8 "++" Expression9;
+ExprCast.	Expression9	::= "\\as" "[" Type "]" Expression9;
+ExprUnPlus.	Expression9	::= "+" Expression10;
+ExprUnMinus.	Expression9	::= "-" Expression10;
+ExprTilde.	Expression9	::= "~" Expression10;
+ExprExp.	Expression10	::= Expression10 "^" Expression11;
+ExprIfThenElse. Expression11    ::= "\\if" "(" Expression ")"
+                                    "\\then" "(" Expression ")"
+                                    "\\else" "(" Expression ")";
+ExprAbs.	Expression11	::= "\\abs" "(" Expression ")";
+ExprMax.	Expression11	::= "\\max" OptArgs;
+ExprMin.	Expression11	::= "\\min" OptArgs;
+ExprDistinct.	Expression11	::= "\\distinct" OptArgs;
+ExprSize.	Expression11	::= "\\size" "(" Expression ")";
+ExprIdApp.	Expression11	::= Ident OptArgs;
+ExprDotAttr.    Expression11    ::= Expression11 "." Ident;
+ExprDotCast.	Expression11	::= Expression11 "." "\\as" "[" Type "]" ;
+ExprDotSize.	Expression11	::= Expression11 "." "\\size";
+ExprDotAbs.	Expression11	::= Expression11 "." "\\abs";
+ExprBracket.	Expression11	::= Expression11 "[" Expression "]";
+ExprBitRange.	Expression11	::= Expression11 "[" IntLit ":" IntLit "]";
+ExprTrue.	Expression11	::= "true";
+ExprFalse.	Expression11	::= "false";
+ExprLit.	Expression11	::= IntLit;
+
+coercions Expression 11;
+
+QuantAll.	Quant		::= "\\forall";
+QuantEx.	Quant		::= "\\exists";
+
+RelEq.		RelSym		::= "=";
+RelNEq.		RelSym		::= "!=";
+RelLeq.		RelSym		::= "<=";
+RelGeq.		RelSym		::= ">=";
+RelLt.		RelSym		::= "<";
+RelGt.		RelSym		::= ">";
+
+NoArgs.		OptArgs		::= ;
+Args.		OptArgs		::= "(" [ArgC] ")";
+Arg.		ArgC		::= Expression;
+separator ArgC ",";
+
+DIntLit.	IntLit		::= DecIntLit;
+HIntLit.	IntLit		::= HexIntLit;
+
+token DecIntLit digit+;
+token HexIntLit (({"0x"} | {"0X"}) ["0123456789ABCDEFabcdef"]+);
+
+--------------------------------------------------------------------------------
+-- Variable and constant declarations
+
+DeclConst.	DeclConstC	::= Type [Ident];
+separator nonempty Ident ",";
+
+DeclSingleVar.  DeclSingleVarC  ::= Type Ident;
+
+DeclVar.	DeclVarC	::= Type [Ident];
+
+DeclBinder1.	DeclBinder	::= DeclVarC ";";
+DeclBinderM.	DeclBinder	::= "(" [DeclVarC] ")";
+separator nonempty DeclVarC ";";
+
+--------------------------------------------------------------------------------
+-- Function declarations
+
+DeclFunConstant.DeclFunC	::= [FunOption] DeclConstC;
+DeclFun.	DeclFunC	::= [FunOption] Type Ident FormalArgsC OptBody;
+terminator DeclFunC ";";
+
+Partial.        FunOption       ::= "\\partial";
+Relational.     FunOption       ::= "\\relational";
+separator FunOption "";
+
+--------------------------------------------------------------------------------
+-- Sort declarations
+
+DeclADT.        DeclSortC       ::= Ident "{" [DeclCtorC] "}";
+DeclUnintSort.  DeclSortC       ::= Ident;
+DeclInfUnintSort.DeclSortC      ::= "\\infinite" Ident;
+terminator DeclSortC ";";
+
+DeclCtor.       DeclCtorC       ::= Ident OptFormalArgs;
+terminator DeclCtorC ";";
+
+--------------------------------------------------------------------------------
+-- Declarations of existential constants
+
+DeclConstant.	DeclConstantC	::= DeclConstC;
+terminator DeclConstantC ";";
+
+--------------------------------------------------------------------------------
+-- Predicate declarations
+
+DeclPred.	DeclPredC	::= [PredOption] Ident OptFormalArgs OptBody;
+terminator DeclPredC ";";
+
+NoFormalArgs.	OptFormalArgs	::= ;
+WithFormalArgs.	OptFormalArgs	::= FormalArgsC;
+FormalArgs.	FormalArgsC	::= "(" [ArgTypeC] ")";
+ArgType.	ArgTypeC	::= Type;
+NamedArgType.	ArgTypeC	::= Type Ident;
+separator nonempty ArgTypeC ",";
+
+NegMatch.       PredOption      ::= "\\negMatch";
+NoMatch.        PredOption      ::= "\\noMatch";
+separator PredOption "";
+
+SomeBody.	OptBody 	::= "{" Expression "}";
+NoBody.		OptBody 	::= ;
+
+--------------------------------------------------------------------------------
+-- Types
+
+TypeInt.	Type		::= "int";
+TypeNat.	Type		::= "nat";
+TypeInterval.	Type		::= "int" "[" IntervalLower "," IntervalUpper "]";
+TypeBool.	Type		::= "bool";
+TypeMod.        Type            ::= "mod" "[" IntervalLower "," IntervalUpper "]";
+TypeBV.         Type            ::= "bv" "[" IntLit "]";
+TypeSignedBV.   Type            ::= "signed" "bv" "[" IntLit "]";
+TypeIdent.	Type		::= Ident;
+
+InfLower.       IntervalLower   ::= "-" "inf";
+NumLower.       IntervalLower   ::= IntLit;
+NegNumLower.    IntervalLower   ::= "-" IntLit;
+InfUpper.       IntervalUpper   ::= "inf";
+NumUpper.       IntervalUpper   ::= IntLit;
+NegNumUpper.    IntervalUpper   ::= "-" IntLit;

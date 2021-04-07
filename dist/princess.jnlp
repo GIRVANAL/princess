@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- JNLP file for Princess -->
+<jnlp spec="1.0+"
+  codebase="http://www.philipp.ruemmer.org/princess/webstart/"
+  href="princess.jnlp">
+<information> 
+<title>Princess</title>
+<vendor>Philipp Ruemmer, Uppsala University</vendor> 
+<homepage href="http://www.philipp.ruemmer.org/princess.shtml"/> 
+<description>
+  The Prover Princess.
+</description> 
+<offline-allowed/> 
+</information> 
+<security> 
+<all-permissions/> 
+</security> 
+<resources> 
+<j2se version="1.6+" initial-heap-size="128m" max-heap-size="1024m"/> 
+<j2se version="1.5+" initial-heap-size="128m" max-heap-size="1024m"/> 
+
+<jar href="princess-all.jar"/> 
+</resources> 
+<application-desc main-class="ap.DialogMain"/> 
+</jnlp> 
