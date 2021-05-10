@@ -3,7 +3,7 @@
  * arithmetic with uninterpreted predicates.
  * <http://www.philipp.ruemmer.org/princess.shtml>
  *
- * Copyright (C) 2012-2020 Philipp Ruemmer <ph_r@gmx.net>
+ * Copyright (C) 2012-2021 Philipp Ruemmer <ph_r@gmx.net>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -2975,7 +2975,7 @@ class SimpleAPI private (enableAssert : Boolean,
         setMostGeneralConstraints(true)
         ?? (~f)
         ??? match {
-          case ProverStatus.Valid   => ~getConstraint
+          case ProverStatus.Valid   => Transform2NNF(~getConstraint)
           case ProverStatus.Invalid => IBoolLit(true)
         }
     } else {
@@ -2991,35 +2991,51 @@ class SimpleAPI private (enableAssert : Boolean,
   /**
    * Simplify a formula by eliminating quantifiers.
    */
-  def simplify(f : IFormula) : IFormula =
-    if (!(ContainsSymbol isPresburgerBVWithPreds f)) {
+  def simplify(f : IFormula) : IFormula = scope {
+    import IExpression._
+
+    // Need to replace free variables in the formula with constants
+    val variables = SymbolCollector variables f
+
+    val maxInd =
+      if (variables.isEmpty)
+        -1
+      else
+        (for (IVariable(ind) <- variables) yield ind).max
+
+    val sorts = Array.fill[Sort](maxInd + 1)(Sort.Integer)
+
+    for (ISortedVariable(ind, s) <- variables)
+      sorts(ind) = s
+
+    val constants = (for (s <- sorts) yield createConstant("X", s)).toList
+    val substF    = VariableSubstVisitor(f, (constants, 0))
+
+    // New start the actual simplification
+
+    val simpF =
+    if (!(ContainsSymbol isPresburgerBVWithPreds substF)) {
       // Formula that we cannot fully simplify at the moment;
       // just run the heuristic simplifier
 
-      // TODO: this won't work if the formula contains theories
-      // that are not yet loaded
+      theoryCollector(substF)
+      addTheoryAxioms
+      processInterpolant(asConjunction(substF))
 
-      processInterpolant(asConjunction(f))
-
-    } else if ((ContainsSymbol isPresburgerBV f) &&
-               (ContainsSymbol isClosed f)) {
+    } else if ((ContainsSymbol isPresburgerBV substF) &&
+               (ContainsSymbol isClosed substF)) {
       // Simplest case, pure Presburger or bit-vector formula
 
       val consts =
-        for (c <- SymbolCollector constantsSorted f) yield IConstant(c)
-      projectAll(f, consts)
+        for (c <- SymbolCollector constantsSorted substF) yield IConstant(c)
 
-    } else scope {
-      import IExpression._
+      if (!(QuantifierCollectingVisitor(substF) contains
+              IExpression.Quantifier.ALL))
+        projectEx(substF, consts)
+      else
+        projectAll(substF, consts)
 
-      // Need to replace free variables in the formula with constants
-      val maxInd =
-        ((Iterator single -1) ++
-         (for (IVariable(v) <- (SymbolCollector variables f).iterator)
-          yield v)).max
-      val subst = createConstants("X", 0 until (maxInd + 1)).toList
-
-      val substF = VariableSubstVisitor(f, (subst, 0))
+    } else {
 
       // Replace remaining predicates in the formula with new constants
       val replacedAtoms = new MHashMap[IAtom, ConstantTerm]
@@ -3044,19 +3060,27 @@ class SimpleAPI private (enableAssert : Boolean,
 
       val allConsts =
         for (c <- SymbolCollector constantsSorted substF2) yield IConstant(c)
-      val res = projectAll(substF2, allConsts)
+
+      val res =
+        if (!(QuantifierCollectingVisitor(substF2) contains
+                IExpression.Quantifier.ALL))
+          projectEx(substF2, allConsts)
+        else
+          projectAll(substF2, allConsts)
 
       // substitute back predicates
       val backSubst =
         (for ((f, c) <- replacedAtoms.iterator) yield (c -> ite(f, 0, 1))).toMap
-      val res2 = SimplifyingConstantSubstVisitor(res, backSubst)
-
-      // substitute back variables
-      val backSubst2 =
-        (for ((IConstant(c), n) <- subst.iterator.zipWithIndex)
-         yield (c, IVariable(n))).toMap
-      ConstantSubstVisitor(res2, backSubst2)
+      SimplifyingConstantSubstVisitor(res, backSubst)
     }
+
+    // substitute back variables
+
+    val backSubst2 =
+      (for ((IConstant(c), n) <- constants.iterator.zipWithIndex)
+       yield (c, IVariable(n, sorts(n)))).toMap
+    ConstantSubstVisitor(simpF, backSubst2)
+  }
   
   //////////////////////////////////////////////////////////////////////////////
 
@@ -3526,12 +3550,14 @@ class SimpleAPI private (enableAssert : Boolean,
     evalPartialHelp(c) getOrElse {
       // then we have to extend the model
     
-      if (!(currentOrder.orderedPredicates forall (_.arity == 0))) {
+      if (!(currentOrder.orderedPredicates forall (_.arity == 0)) ||
+          Sort.sortOf(c) != Sort.Integer) {
         // we assume 0 as default value, but have to store this value
         import TerForConvenience._
         implicit val o = order
         currentModel = currentModel & (c === 0)
         lastPartialModel = null
+        decoderDataCache.clear
       }
       
       IdealInt.ZERO
